@@ -1,0 +1,27 @@
+{
+  "title": "Tracking Hospital Assets",
+  "appid": "",
+  "group": "",
+  "webmap": "",
+  "webscene": "bd0e736afaa24332ba9edc6e03102404",
+  "portalUrl": "https://indoors-ent.bd.esri.com/portal",
+  "oauthappid": "Xk7F40Ax7A9oBodz",
+  "proxyUrl": "https://apl.esri.com/proxy/DotNet/proxy.ashx",
+  "units": "dual",
+  "helperServices": {
+    "geometry": {
+      "url": null
+    },
+    "printTask": {
+      "url": null
+    },
+    "elevationSync": {
+      "url": null
+    },
+    "geocode": [
+      {
+        "url": null
+      }
+    ]
+  }
+}
