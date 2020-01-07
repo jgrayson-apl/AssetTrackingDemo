@@ -1,0 +1,216 @@
+
+/*
+ const trackingFields = [
+  {
+    name: "ObjectID",
+    alias: "ObjectID",
+    type: "oid",
+    valueType: "none"
+  },
+  {
+    name: "longitude",
+    alias: "Longitude",
+    type: "double",
+    valueType: "coordinate"
+  },
+  {
+    name: "latitude",
+    alias: "Latitude",
+    type: "double",
+    valueType: "coordinate"
+  },
+  {
+    name: "x",
+    alias: "X",
+    type: "double",
+    valueType: "coordinate"
+  },
+  {
+    name: "y",
+    alias: "Y",
+    type: "double",
+    valueType: "coordinate"
+  },
+  {
+    name: "z",
+    alias: "Z",
+    type: "double",
+    valueType: "coordinate"
+  },
+  {
+    name: "assetID",
+    alias: "ID",
+    type: "string",
+    valueType: "unique-identifier"
+  },
+  {
+    name: "assetType",
+    alias: "Type",
+    type: "string",
+    valueType: "type-or-category"
+  },
+  {
+    name: "LEVEL_NUMBER",
+    alias: "Floor",
+    type: "integer",
+    valueType: "measurement"
+  },
+  {
+    name: "routeName",
+    alias: "Route Name",
+    type: "string",
+    valueType: "description"
+  },
+  {
+    name: "travelMode",
+    alias: "Travel Mode",
+    type: "string",
+    valueType: "type-or-category"
+  },
+  {
+    name: "alongMinutes",
+    alias: "Minutes Along",
+    type: "double",
+    valueType: "measurement"
+  },
+  {
+    name: "totalTime",
+    alias: "Total Minutes",
+    type: "double",
+    valueType: "measurement"
+  },
+  {
+    name: "startTime",
+    alias: "Start Time",
+    type: "date",
+    valueType: "date-and-time"
+  },
+  {
+    name: "endTime",
+    alias: "End Time",
+    type: "date",
+    valueType: "date-and-time"
+  }
+];
+*/
+
+
+/*
+
+const trackingLayer = new FeatureLayer({
+  id: "hospital_assets",
+  title: "Hospital Assets",
+  fields: [
+    {
+      name: "ObjectID",
+      alias: "ObjectID",
+      type: "oid",
+      valueType: "none"
+    },
+    {
+      name: "assetID",
+      alias: "ID",
+      type: "string",
+      valueType: "unique-identifier"
+    },
+    {
+      name: "assetType",
+      alias: "Type",
+      type: "string",
+      valueType: "type-or-category"
+    },
+    {
+      name: "LEVEL_NUMBER",
+      alias: "Floor",
+      type: "integer",
+      valueType: "measurement"
+    },
+    {
+      name: "routeName",
+      alias: "Route Name",
+      type: "string",
+      valueType: "description"
+    },
+    {
+      name: "travelMode",
+      alias: "Travel Mode",
+      type: "string",
+      valueType: "type-or-category"
+    },
+    {
+      name: "alongMinutes",
+      alias: "Minutes Along",
+      type: "double",
+      valueType: "measurement"
+    },
+    {
+      name: "totalTime",
+      alias: "Total Minutes",
+      type: "double",
+      valueType: "measurement"
+    },
+    {
+      name: "startTime",
+      alias: "Start Time",
+      type: "date",
+      valueType: "date-and-time"
+    },
+    {
+      name: "endTime",
+      alias: "End Time",
+      type: "date",
+      valueType: "date-and-time"
+    }
+  ],
+  outFields: ["*"],
+  objectIdField: "ObjectID",
+  geometryType: "point",
+  hasZ: true, hasM: true,
+  spatialReference: { wkid: 102100 },
+  source: trackingFS.features,
+  timeInfo: { startField: "startTime", endField: "endTime" },
+  //elevationInfo: { mode: "absolute-height", offset: symbolSize },
+  popupTemplate: { content: "{assetType}: {routeName} @ {alongMinutes} of {totalTime}" },
+  renderer: {
+    type: "unique-value",
+    field: "assetType",
+    uniqueValueInfos: assetTypes.map(assetType => {
+      return {
+        value: assetType.type,
+        symbol: getLocationSymbol(assetType.color)
+      };
+    })
+  },
+  labelsVisible: true,
+  labelingInfo: [
+    {
+      labelExpressionInfo: {
+        expression: `"[" + $feature.LEVEL_NUMBER + "] " + $feature.assetType`
+      },
+      symbol: {
+        type: "label-3d",
+        symbolLayers: [
+          {
+            type: "text",
+            size: 11,
+            material: { color: Color.named.dodgerblue },
+            halo: { color: Color.named.white, size: 0.5 }
+          }
+        ],
+        verticalOffset: {
+          screenLength: 50,
+          maxWorldLength: 200,
+          minWorldLength: 10
+        },
+        callout: {
+          type: "line",
+          size: 1.0,
+          color: Color.named.dodgerblue,
+          border: { color: Color.named.silver }
+        }
+      }
+    }
+  ]
+});
+});
+*/

@@ -39,6 +39,7 @@ define([
   "esri/layers/Layer",
   "esri/layers/CSVLayer",
   "esri/layers/FeatureLayer",
+  "esri/layers/StreamLayer",
   "esri/geometry/Extent",
   "esri/Graphic",
   "esri/widgets/Home",
@@ -50,7 +51,8 @@ define([
   "esri/widgets/Expand"
 ], function(calcite, declare, ApplicationBase, i18n, itemUtils, domHelper,
             Color, colors, number, date, locale, on, query, dom, domClass, domConstruct,
-            IdentityManager, Evented, watchUtils, promiseUtils, Portal, Layer, CSVLayer, FeatureLayer, Extent,
+            IdentityManager, Evented, watchUtils, promiseUtils, Portal,
+            Layer, CSVLayer, FeatureLayer, StreamLayer, Extent,
             Graphic, Home, TimeSlider, Search, LayerList, Legend, BasemapGallery, Expand){
 
   return declare([Evented], {
@@ -273,16 +275,16 @@ define([
                 halo: { color: Color.named.gray, size: 1.5 }
               }
             ]/*,
-            verticalOffset: {
-              screenLength: 5,
-              maxWorldLength: 50,
-              minWorldLength: 5
-            },
-            callout: {
-              type: "line",
-              size: 0.5,
-              color: Color.named.silver
-            }*/
+                 verticalOffset: {
+                   screenLength: 5,
+                   maxWorldLength: 50,
+                   minWorldLength: 5
+                 },
+                 callout: {
+                   type: "line",
+                   size: 0.5,
+                   color: Color.named.silver
+                 }*/
           }
         }
       };
@@ -327,105 +329,49 @@ define([
         return createMovingAssetLabels(assetType);
       });
 
-      const trackingCSVLayer = new CSVLayer({
+
+      const trackingLayer = new StreamLayer({
+        url: "https://geoxc2-ge.bd.esri.com:6443/arcgis/rest/services/HospitalAssets-stream-service-out/StreamServer",
         title: "Hospital Assets",
-        url: "./assets/HospitalAssets.csv",
-        elevationInfo: {
-          mode: "absolute-height",
-          featureExpressionInfo: { expression: "$feature.z" },
-          unit: "meters"
-        },
-        timeInfo: { startField: "startTime", endField: "endTime" },
-        popupTemplate: { content: "{assetType}: {routeName} @ {alongMinutes} of {totalTime}" },
+        outFields: ["*"],
+        //popupTemplate: { content: "{assetType}: {routeName} @ {alongMinutes} of {totalTime}" },
         labelsVisible: true,
         labelingInfo: assetLabelingInfo.concat(movingAssetLabelingInfo),
         renderer: assetsRenderer
       });
-      trackingCSVLayer.load().then(() => {
+      trackingLayer.load().then(() => {
 
-        trackingCSVLayer.fields.forEach(field => {
+        trackingLayer.fields.forEach(field => {
           if(field.name === "assetType"){
-            field.alias = "Type";
+            field.alias = "Critical Assets";
           }
         });
+        view.map.add(trackingLayer);
 
         const legendPanel = domConstruct.create("div", { className: "panel panel-dark panel-no-padding" });
-        const legend = new Legend({ container: domConstruct.create("div", {}, legendPanel), view: view, layerInfos: [{ layer: trackingCSVLayer }] });
+        const legend = new Legend({ container: domConstruct.create("div", {}, legendPanel), view: view, layerInfos: [{ layer: trackingLayer }] });
         view.ui.add(legendPanel, "top-right");
-
-        const startTime = date.add(trackingCSVLayer.timeInfo.fullTimeExtent.start, "minute", 2);
-
-        const timeSlider = new TimeSlider({
-          container: "time-slider-container",
-          view: view,
-          mode: "instant",
-          timeVisible: true,
-          playRate: 500,
-          loop: true,
-          stops: { interval: { value: 500, unit: "milliseconds" } },
-          fullTimeExtent: trackingCSVLayer.timeInfo.fullTimeExtent,
-          values: [startTime]
-        });
-        timeSlider.next();
-
 
         const loadingLabel = dom.byId("loading-label");
         const playPauseBtn = dom.byId("play-pause-btn");
 
-        view.map.add(trackingCSVLayer);
-        view.whenLayerView(trackingCSVLayer).then(trackingCSVLayerView => {
+        view.whenLayerView(trackingLayer).then(trackingCSVLayerView => {
           loadingLabel.innerHTML = "Loading asset details...";
 
-          const displayMovingAssets = true;
-          if(displayMovingAssets){
+          this.initializeSceneSpin(view).then(() => {
 
-            const movingPanel = domConstruct.create("div", { className: "panel panel-dark padding-trailer-0" });
-            view.ui.add(movingPanel, "bottom-left");
+            domClass.add(loadingLabel, "hide");
+            domClass.remove(playPauseBtn, "hide");
 
-            timeSlider.watch("timeExtent", timeExtent => {
-              trackingCSVLayerView.queryFeatures({
-                where: "alongMinutes > 0.0",
-                timeExtent: timeExtent,
-                orderByFields: ["assetID"]
-              }).then(movingFS => {
-
-                requestAnimationFrame(() => {
-                  movingPanel.innerHTML = movingFS.features.map(feature => {
-                    return `<div class="moving-info-node trailer-quarter">
-                              <span>${feature.attributes.assetType}</span>
-                              <span class="padding-left-2 right">
-                                ${feature.attributes.alongMinutes.toFixed(2).padStart(5, "0")}
-                                <progress value="${feature.attributes.alongMinutes}" max="${feature.attributes.totalTime}"></progress>                        
-                                ${feature.attributes.totalTime.toFixed(2).padStart(5, "0")}
-                              </span>
-                            </div>`;
-                  }).join("");
-                });
-
-              });
+            on(playPauseBtn, "click", () => {
+              domClass.toggle(playPauseBtn, "icon-ui-pause icon-ui-play");
+              if(domClass.contains(playPauseBtn, "icon-ui-pause")){
+                this.enableSpin(true);
+              } else {
+                this.enableSpin(false);
+              }
             });
-          }
 
-          watchUtils.whenNotOnce(trackingCSVLayerView, "updating", () => {
-            this.initializeSceneSpin(view).then(() => {
-
-              domClass.add(loadingLabel, "hide");
-              domClass.remove(playPauseBtn, "hide");
-
-              timeSlider.play();
-
-              on(playPauseBtn, "click", () => {
-                domClass.toggle(playPauseBtn, "icon-ui-pause icon-ui-play");
-                if(domClass.contains(playPauseBtn, "icon-ui-pause")){
-                  //timeSlider.play();
-                  this.enableSpin(true);
-                } else {
-                  //timeSlider.stop();
-                  this.enableSpin(false);
-                }
-              });
-
-            });
           });
         });
       });
@@ -447,10 +393,6 @@ define([
           }
         };
 
-        // view.on("click", [], clickEvt => {
-        //   this.enableSpin(clickEvt.button === 0);
-        // });
-
         // HEADING INCREMENT //
         let headingIncrement = 0.025;
 
@@ -467,230 +409,9 @@ define([
           }
         };
 
-        watchUtils.whenFalseOnce(view, "updating", () => {
-          watchUtils.whenFalse(view, "interacting", rotate);
-          //this.enableSpin(true);
-          resolve();
-        });
+        resolve();
       });
     }
 
   });
 });
-
-
-/*
- const trackingFields = [
-  {
-    name: "ObjectID",
-    alias: "ObjectID",
-    type: "oid",
-    valueType: "none"
-  },
-  {
-    name: "longitude",
-    alias: "Longitude",
-    type: "double",
-    valueType: "coordinate"
-  },
-  {
-    name: "latitude",
-    alias: "Latitude",
-    type: "double",
-    valueType: "coordinate"
-  },
-  {
-    name: "x",
-    alias: "X",
-    type: "double",
-    valueType: "coordinate"
-  },
-  {
-    name: "y",
-    alias: "Y",
-    type: "double",
-    valueType: "coordinate"
-  },
-  {
-    name: "z",
-    alias: "Z",
-    type: "double",
-    valueType: "coordinate"
-  },
-  {
-    name: "assetID",
-    alias: "ID",
-    type: "string",
-    valueType: "unique-identifier"
-  },
-  {
-    name: "assetType",
-    alias: "Type",
-    type: "string",
-    valueType: "type-or-category"
-  },
-  {
-    name: "LEVEL_NUMBER",
-    alias: "Floor",
-    type: "integer",
-    valueType: "measurement"
-  },
-  {
-    name: "routeName",
-    alias: "Route Name",
-    type: "string",
-    valueType: "description"
-  },
-  {
-    name: "travelMode",
-    alias: "Travel Mode",
-    type: "string",
-    valueType: "type-or-category"
-  },
-  {
-    name: "alongMinutes",
-    alias: "Minutes Along",
-    type: "double",
-    valueType: "measurement"
-  },
-  {
-    name: "totalTime",
-    alias: "Total Minutes",
-    type: "double",
-    valueType: "measurement"
-  },
-  {
-    name: "startTime",
-    alias: "Start Time",
-    type: "date",
-    valueType: "date-and-time"
-  },
-  {
-    name: "endTime",
-    alias: "End Time",
-    type: "date",
-    valueType: "date-and-time"
-  }
-];
-*/
-
-
-/*
-
-const trackingLayer = new FeatureLayer({
-  id: "hospital_assets",
-  title: "Hospital Assets",
-  fields: [
-    {
-      name: "ObjectID",
-      alias: "ObjectID",
-      type: "oid",
-      valueType: "none"
-    },
-    {
-      name: "assetID",
-      alias: "ID",
-      type: "string",
-      valueType: "unique-identifier"
-    },
-    {
-      name: "assetType",
-      alias: "Type",
-      type: "string",
-      valueType: "type-or-category"
-    },
-    {
-      name: "LEVEL_NUMBER",
-      alias: "Floor",
-      type: "integer",
-      valueType: "measurement"
-    },
-    {
-      name: "routeName",
-      alias: "Route Name",
-      type: "string",
-      valueType: "description"
-    },
-    {
-      name: "travelMode",
-      alias: "Travel Mode",
-      type: "string",
-      valueType: "type-or-category"
-    },
-    {
-      name: "alongMinutes",
-      alias: "Minutes Along",
-      type: "double",
-      valueType: "measurement"
-    },
-    {
-      name: "totalTime",
-      alias: "Total Minutes",
-      type: "double",
-      valueType: "measurement"
-    },
-    {
-      name: "startTime",
-      alias: "Start Time",
-      type: "date",
-      valueType: "date-and-time"
-    },
-    {
-      name: "endTime",
-      alias: "End Time",
-      type: "date",
-      valueType: "date-and-time"
-    }
-  ],
-  outFields: ["*"],
-  objectIdField: "ObjectID",
-  geometryType: "point",
-  hasZ: true, hasM: true,
-  spatialReference: { wkid: 102100 },
-  source: trackingFS.features,
-  timeInfo: { startField: "startTime", endField: "endTime" },
-  //elevationInfo: { mode: "absolute-height", offset: symbolSize },
-  popupTemplate: { content: "{assetType}: {routeName} @ {alongMinutes} of {totalTime}" },
-  renderer: {
-    type: "unique-value",
-    field: "assetType",
-    uniqueValueInfos: assetTypes.map(assetType => {
-      return {
-        value: assetType.type,
-        symbol: getLocationSymbol(assetType.color)
-      };
-    })
-  },
-  labelsVisible: true,
-  labelingInfo: [
-    {
-      labelExpressionInfo: {
-        expression: `"[" + $feature.LEVEL_NUMBER + "] " + $feature.assetType`
-      },
-      symbol: {
-        type: "label-3d",
-        symbolLayers: [
-          {
-            type: "text",
-            size: 11,
-            material: { color: Color.named.dodgerblue },
-            halo: { color: Color.named.white, size: 0.5 }
-          }
-        ],
-        verticalOffset: {
-          screenLength: 50,
-          maxWorldLength: 200,
-          minWorldLength: 10
-        },
-        callout: {
-          type: "line",
-          size: 1.0,
-          color: Color.named.dodgerblue,
-          border: { color: Color.named.silver }
-        }
-      }
-    }
-  ]
-});
-});
-*/
