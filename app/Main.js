@@ -219,11 +219,11 @@ define([
     applicationReady: function(view){
 
       const assetTypes = [
-        { type: "Wheelchair", withinBuilding: false, travelMode: "Wheelchair", stops: 3, count: 6, default: 6, color: Color.named.dodgerblue },
-        { type: "Mobile X-Ray", withinBuilding: true, travelMode: "Wheelchair", stops: 2, count: 2, default: 2, color: Color.named.purple },
-        { type: "Code Cart", withinBuilding: true, travelMode: "Wheelchair", stops: 2, count: 2, default: 2, color: Color.named.orange },
-        { type: "IV Pole", withinBuilding: true, travelMode: "Walking", stops: 2, count: 2, default: 2, color: Color.named.limegreen },
-        { type: "Security Guard", withinBuilding: false, travelMode: "Walking", stops: 4, count: 10, default: 6, color: Color.named.red }
+        { type: "Wheelchair", color: Color.named.dodgerblue },
+        { type: "Mobile X-Ray", color: Color.named.purple },
+        { type: "Code Cart", color: Color.named.orange },
+        { type: "IV Pole", color: Color.named.limegreen },
+        { type: "Security Guard", color: Color.named.red }
       ];
 
       const symbolSize = 0.5;
@@ -274,17 +274,17 @@ define([
                 material: { color: Color.named.white },
                 halo: { color: Color.named.gray, size: 1.5 }
               }
-            ]/*,
-                 verticalOffset: {
-                   screenLength: 5,
-                   maxWorldLength: 50,
-                   minWorldLength: 5
-                 },
-                 callout: {
-                   type: "line",
-                   size: 0.5,
-                   color: Color.named.silver
-                 }*/
+            ],
+            verticalOffset: {
+              screenLength: 60,
+              maxWorldLength: 250,
+              minWorldLength: 10
+            },
+            callout: {
+              type: "line",
+              size: 0.5,
+              color: Color.named.silver
+            }
           }
         }
       };
@@ -301,7 +301,7 @@ define([
             symbolLayers: [
               {
                 type: "text",
-                size: "9pt",
+                size: "11pt",
                 material: { color: assetType.color },
                 halo: { color: Color.named.white, size: 2.5 }
               }
@@ -334,6 +334,7 @@ define([
         url: "https://geoxc2-ge.bd.esri.com:6443/arcgis/rest/services/HospitalAssets-stream-service-out/StreamServer",
         title: "Hospital Assets",
         outFields: ["*"],
+        //maximumTrackPoints: 25,
         //popupTemplate: { content: "{assetType}: {routeName} @ {alongMinutes} of {totalTime}" },
         labelsVisible: true,
         labelingInfo: assetLabelingInfo.concat(movingAssetLabelingInfo),
@@ -355,11 +356,17 @@ define([
         const loadingLabel = dom.byId("loading-label");
         const playPauseBtn = dom.byId("play-pause-btn");
 
-        view.whenLayerView(trackingLayer).then(trackingCSVLayerView => {
+        //
+        // http://mgeorge-lx/demo/incidents.html
+        //
+        view.whenLayerView(trackingLayer).then(trackingLayerView => {
+
+          // trackingLayerView.on("data-received", evt => {
+          //   console.info(evt);
+          // });
+
           loadingLabel.innerHTML = "Loading asset details...";
-
           this.initializeSceneSpin(view).then(() => {
-
             domClass.add(loadingLabel, "hide");
             domClass.remove(playPauseBtn, "hide");
 
@@ -373,6 +380,7 @@ define([
             });
 
           });
+
         });
       });
 
