@@ -334,6 +334,7 @@ define([
         url: "https://geoxc2-ge.bd.esri.com:6443/arcgis/rest/services/HospitalAssets-stream-service-out/StreamServer",
         title: "Hospital Assets",
         outFields: ["*"],
+        screenSizePerspectiveEnabled: true,
         //maximumTrackPoints: 25,
         //popupTemplate: { content: "{assetType}: {routeName} @ {alongMinutes} of {totalTime}" },
         labelsVisible: true,
@@ -341,6 +342,7 @@ define([
         renderer: assetsRenderer
       });
       trackingLayer.load().then(() => {
+        //console.info(trackingLayer.fields.map(f => {return `${f.name}: ${f.type}`}));
 
         trackingLayer.fields.forEach(field => {
           if(field.name === "assetType"){
@@ -353,33 +355,22 @@ define([
         const legend = new Legend({ container: domConstruct.create("div", {}, legendPanel), view: view, layerInfos: [{ layer: trackingLayer }] });
         view.ui.add(legendPanel, "top-right");
 
-        const loadingLabel = dom.byId("loading-label");
-        const playPauseBtn = dom.byId("play-pause-btn");
-
         //
         // http://mgeorge-lx/demo/incidents.html
         //
         view.whenLayerView(trackingLayer).then(trackingLayerView => {
 
-          // trackingLayerView.on("data-received", evt => {
-          //   console.info(evt);
-          // });
+          // SCENE SPIN //
+          this.initializeSceneSpin(view);
 
-          loadingLabel.innerHTML = "Loading asset details...";
-          this.initializeSceneSpin(view).then(() => {
-            domClass.add(loadingLabel, "hide");
-            domClass.remove(playPauseBtn, "hide");
+          // FLOOR SELECTOR //
+          //this.initializeFloorSelector(view, trackingLayerView);
 
-            on(playPauseBtn, "click", () => {
-              domClass.toggle(playPauseBtn, "icon-ui-pause icon-ui-play");
-              if(domClass.contains(playPauseBtn, "icon-ui-pause")){
-                this.enableSpin(true);
-              } else {
-                this.enableSpin(false);
-              }
-            });
-
-          });
+          /*const assetsList = new Map();
+          trackingLayerView.on("data-received", assetFeature => {
+            const assetID = assetFeature.attributes.assetID;
+            assetsList.set(assetID, assetFeature);
+          });*/
 
         });
       });
@@ -391,33 +382,87 @@ define([
      * @param view
      */
     initializeSceneSpin: function(view){
-      return promiseUtils.create((resolve, reject) => {
 
-        let rotating = false;
-        this.enableSpin = enabled => {
-          rotating = enabled;
+      // ENABLE SPIN //
+      let rotating = false;
+      this.enableSpin = enabled => {
+        rotating = enabled;
+        if(rotating){
+          rotate();
+        }
+      };
+
+      // HEADING INCREMENT //
+      let headingIncrement = 0.025;
+
+      // ROTATE SCENE //
+      const rotate = () => {
+        if(!view.interacting){
+          view.goTo({
+            center: view.center,
+            heading: (view.camera.heading + headingIncrement)
+          }, { animate: false });
           if(rotating){
-            rotate();
+            requestAnimationFrame(rotate);
           }
-        };
+        }
+      };
 
-        // HEADING INCREMENT //
-        let headingIncrement = 0.025;
+      const loadingLabel = dom.byId("loading-label");
+      domClass.add(loadingLabel, "hide");
 
-        // ROTATE SCENE //
-        const rotate = () => {
-          if(!view.interacting){
-            view.goTo({
-              center: view.center,
-              heading: (view.camera.heading + headingIncrement)
-            }, { animate: false });
-            if(rotating){
-              requestAnimationFrame(rotate);
-            }
-          }
-        };
+      const playPauseBtn = dom.byId("play-pause-btn");
+      domClass.remove(playPauseBtn, "hide");
 
-        resolve();
+      on(playPauseBtn, "click", () => {
+        domClass.toggle(playPauseBtn, "icon-ui-pause icon-ui-play");
+        if(domClass.contains(playPauseBtn, "icon-ui-pause")){
+          this.enableSpin(true);
+        } else {
+          this.enableSpin(false);
+        }
+      });
+
+    },
+
+    /**
+     *
+     * @param view
+     * @param trackingLayerView
+     */
+    initializeFloorSelector: function(view, trackingLayerView){
+
+      const campusLayerTitles = ["Walls", "Doors", "Units"];
+      const campusLayers = view.map.layers.filter(layer => campusLayerTitles.includes(layer.title));
+
+      const floorsPanel = domConstruct.create("div", { className: "panel panel-dark" });
+      view.ui.add(floorsPanel, "top-right");
+      const radioGroup = domConstruct.create("fieldset", { id: "floor-selector", className: "radio-group trailer-0" }, floorsPanel);
+      domConstruct.create("legend", { className: "radio-group-title icon-ui-filter", innerHTML: "Floor Filter" }, radioGroup);
+      domConstruct.create("input", { className: "radio-group-input", id: "floor-1", type: "radio", name: "floor-selector" }, radioGroup);
+      domConstruct.create("label", { className: "radio-group-label", for: "floor-1", innerHTML: "1" }, radioGroup);
+      domConstruct.create("input", { className: "radio-group-input", id: "floor-2", type: "radio", name: "floor-selector" }, radioGroup);
+      domConstruct.create("label", { className: "radio-group-label", for: "floor-2", innerHTML: "2" }, radioGroup);
+      domConstruct.create("input", { className: "radio-group-input", id: "floor-3", type: "radio", name: "floor-selector" }, radioGroup);
+      domConstruct.create("label", { className: "radio-group-label", for: "floor-3", innerHTML: "3" }, radioGroup);
+      domConstruct.create("input", { className: "radio-group-input", id: "floor-all", type: "radio", name: "floor-selector", checked: "checked" }, radioGroup);
+      domConstruct.create("label", { className: "radio-group-label", for: "floor-all", innerHTML: "all" }, radioGroup);
+
+      query("#floor-selector input").on("change", evt => {
+
+        const floorId = query("#floor-selector input:checked")[0].id;
+        const floorNumber = (floorId === "floor-all") ? null : Number(floorId.split("-")[1]);
+
+        campusLayers.forEach(layer => {
+          view.whenLayerView(layer).then(layerView => {
+            layerView.filter = {
+              where: floorNumber ? `level_number = ${floorNumber}` : null
+            };
+          });
+        });
+
+        //trackingLayerView.filter = floorNumber ? { where: `LEVEL_NUMBER = ${floorNumber}` } : null;
+
       });
     }
 
