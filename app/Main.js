@@ -55,6 +55,10 @@ define([
             Layer, CSVLayer, FeatureLayer, StreamLayer, Extent,
             Graphic, Home, TimeSlider, Search, LayerList, Legend, BasemapGallery, Expand){
 
+  //
+  // http://mgeorge-lx/demo/incidents.html
+  //
+
   return declare([Evented], {
 
     /**
@@ -126,7 +130,7 @@ define([
       dom.byId("app-title-node").innerHTML = config.title;
 
       // USER SIGN IN //
-      return this.initializeUserSignIn(view).always(() => {
+      return this.initializeUserSignIn().catch(console.warn).then(() => {
 
         // POPUP DOCKING OPTIONS //
         view.popup.dockEnabled = true;
@@ -135,6 +139,10 @@ define([
           breakpoint: false,
           position: "top-center"
         };
+
+        // HOME //
+        const home = new Home({ view: view });
+        view.ui.add(home, { position: "top-left", index: 0 });
 
         watchUtils.whenFalseOnce(view, "updating", () => {
           // APPLICATION READY //
@@ -149,13 +157,12 @@ define([
      *
      * @returns {*}
      */
-    initializeUserSignIn: function(view){
+    initializeUserSignIn: function(){
 
       const checkSignInStatus = () => {
-        return IdentityManager.checkSignInStatus(this.base.portal.url).then(userSignIn);
+        return IdentityManager.checkSignInStatus(this.base.portal.url).then(userSignIn).catch(userSignOut).then();
       };
       IdentityManager.on("credential-create", checkSignInStatus);
-      IdentityManager.on("credential-destroy", checkSignInStatus);
 
       // SIGN IN NODE //
       const signInNode = dom.byId("sign-in-node");
@@ -183,7 +190,7 @@ define([
         return this.base.portal.load().then(() => {
           this.emit("portal-user-change", {});
           return updateSignInUI();
-        }).otherwise(console.warn);
+        }).catch(console.warn).then();
       };
 
       // SIGN OUT //
@@ -194,7 +201,7 @@ define([
           this.base.portal.user = null;
           this.emit("portal-user-change", {});
           return updateSignInUI();
-        }).otherwise(console.warn);
+        }).catch(console.warn).then();
 
       };
 
@@ -222,7 +229,7 @@ define([
         { type: "Wheelchair", color: Color.named.dodgerblue },
         { type: "Mobile X-Ray", color: Color.named.purple },
         { type: "Code Cart", color: Color.named.orange },
-        { type: "IV Pole", color: Color.named.limegreen },
+        { type: "IV Pump", color: Color.named.limegreen },
         { type: "Security Guard", color: Color.named.red }
       ];
 
@@ -329,51 +336,63 @@ define([
         return createMovingAssetLabels(assetType);
       });
 
-
       const trackingLayer = new StreamLayer({
-        url: "https://geoxc2-ge.bd.esri.com:6443/arcgis/rest/services/HospitalAssets-stream-service-out/StreamServer",
+        url: "https://geoxc2-ge.bd.esri.com/server/rest/services/HospitalAssets-stream-service-out/StreamServer",
         title: "Hospital Assets",
         outFields: ["*"],
         screenSizePerspectiveEnabled: true,
-        //maximumTrackPoints: 25,
         //popupTemplate: { content: "{assetType}: {routeName} @ {alongMinutes} of {totalTime}" },
         labelsVisible: true,
         labelingInfo: assetLabelingInfo.concat(movingAssetLabelingInfo),
         renderer: assetsRenderer
       });
       trackingLayer.load().then(() => {
-        //console.info(trackingLayer.fields.map(f => {return `${f.name}: ${f.type}`}));
+        //console.info(trackingLayer.fields.map(f => f.name));
 
+        // ASSET TYPE FIELD //
         trackingLayer.fields.forEach(field => {
           if(field.name === "assetType"){
             field.alias = "Critical Assets";
           }
         });
+        // ADD LAYER TO MAP //
         view.map.add(trackingLayer);
 
-        const legendPanel = domConstruct.create("div", { className: "panel panel-dark panel-no-padding" });
-        const legend = new Legend({ container: domConstruct.create("div", {}, legendPanel), view: view, layerInfos: [{ layer: trackingLayer }] });
-        view.ui.add(legendPanel, "top-right");
-
-        //
-        // http://mgeorge-lx/demo/incidents.html
-        //
+        // WHEN LAYERVIEW IS READY //
         view.whenLayerView(trackingLayer).then(trackingLayerView => {
+
+          const optionsPanel = document.getElementById("options-panel");
+          view.ui.add(optionsPanel, "bottom-left");
+          optionsPanel.classList.remove("hide");
+
+          // FLOOR SELECTOR //
+          this.initializeFloorSelector(view, trackingLayerView);
+
+          // LEGEND //
+          this.initializeLegend(view, trackingLayer);
+
+          // STATISTICS //
+          this.initializeStats(view, trackingLayerView, assetTypes);
 
           // SCENE SPIN //
           this.initializeSceneSpin(view);
 
-          // FLOOR SELECTOR //
-          //this.initializeFloorSelector(view, trackingLayerView);
-
-          /*const assetsList = new Map();
-          trackingLayerView.on("data-received", assetFeature => {
-            const assetID = assetFeature.attributes.assetID;
-            assetsList.set(assetID, assetFeature);
-          });*/
-
         });
       });
+
+    },
+
+    /**
+     *
+     * @param view
+     * @param trackingLayer
+     */
+    initializeLegend: function(view, trackingLayer){
+
+      // LEGEND //
+      const legendPanel = domConstruct.create("div", { className: "panel panel-dark panel-no-padding animate-fade-in" });
+      const legend = new Legend({ container: domConstruct.create("div", {}, legendPanel), view: view, layerInfos: [{ layer: trackingLayer }] });
+      view.ui.add(legendPanel, "top-right");
 
     },
 
@@ -435,23 +454,12 @@ define([
       const campusLayerTitles = ["Walls", "Doors", "Units"];
       const campusLayers = view.map.layers.filter(layer => campusLayerTitles.includes(layer.title));
 
-      const floorsPanel = domConstruct.create("div", { className: "panel panel-dark" });
-      view.ui.add(floorsPanel, "top-right");
-      const radioGroup = domConstruct.create("fieldset", { id: "floor-selector", className: "radio-group trailer-0" }, floorsPanel);
-      domConstruct.create("legend", { className: "radio-group-title icon-ui-filter", innerHTML: "Floor Filter" }, radioGroup);
-      domConstruct.create("input", { className: "radio-group-input", id: "floor-1", type: "radio", name: "floor-selector" }, radioGroup);
-      domConstruct.create("label", { className: "radio-group-label", for: "floor-1", innerHTML: "1" }, radioGroup);
-      domConstruct.create("input", { className: "radio-group-input", id: "floor-2", type: "radio", name: "floor-selector" }, radioGroup);
-      domConstruct.create("label", { className: "radio-group-label", for: "floor-2", innerHTML: "2" }, radioGroup);
-      domConstruct.create("input", { className: "radio-group-input", id: "floor-3", type: "radio", name: "floor-selector" }, radioGroup);
-      domConstruct.create("label", { className: "radio-group-label", for: "floor-3", innerHTML: "3" }, radioGroup);
-      domConstruct.create("input", { className: "radio-group-input", id: "floor-all", type: "radio", name: "floor-selector", checked: "checked" }, radioGroup);
-      domConstruct.create("label", { className: "radio-group-label", for: "floor-all", innerHTML: "all" }, radioGroup);
-
       query("#floor-selector input").on("change", evt => {
 
         const floorId = query("#floor-selector input:checked")[0].id;
         const floorNumber = (floorId === "floor-all") ? null : Number(floorId.split("-")[1]);
+
+        trackingLayerView.filter = floorNumber ? { where: `LEVEL_NUMBER = ${floorNumber}` } : null;
 
         campusLayers.forEach(layer => {
           view.whenLayerView(layer).then(layerView => {
@@ -461,9 +469,51 @@ define([
           });
         });
 
-        //trackingLayerView.filter = floorNumber ? { where: `LEVEL_NUMBER = ${floorNumber}` } : null;
+        this.updateCounts();
 
       });
+    },
+
+    /**
+     *
+     * @param view
+     * @param trackingLayerView
+     * @param assetTypes
+     */
+    initializeStats: function(view, trackingLayerView, assetTypes){
+
+      const countsNode = document.getElementById("counts-node");
+
+      const countNodeByAssetType = assetTypes.reduce((list, assetType) => {
+        const assetTypeNode = domConstruct.create("div", { className: "font-size-2" }, countsNode);
+        const labelNode = domConstruct.create("span", { className: "padding-left-half", style: `border-left:solid 4px ${new Color(assetType.color).toHex()}`, innerHTML: assetType.type }, assetTypeNode);
+        const countNode = domConstruct.create("span", { className: "count-node right", innerHTML: "0" }, assetTypeNode);
+        list.set(assetType.type, countNode);
+        return list;
+      }, new Map());
+
+      let getLatestHandle;
+      this.updateCounts = () => {
+
+        const latestQuery = trackingLayerView.filter ? trackingLayerView.filter.createQuery() : trackingLayerView.createQuery();
+        latestQuery.set({
+          groupByFieldsForStatistics: ["assetType"],
+          outStatistics: [{ statisticType: "count", onStatisticField: "assetType", outStatisticFieldName: "assetCount" }]
+        });
+
+        getLatestHandle = trackingLayerView.queryLatestObservations(latestQuery).then(latestFS => {
+          latestFS.features.forEach(feature => {
+            countNodeByAssetType.get(feature.attributes.assetType).innerHTML = feature.attributes.assetCount;
+          });
+        });
+
+      };
+
+      let intervalHandle;
+      watchUtils.whenFalseOnce(trackingLayerView, "updating", () => {
+        intervalHandle = setInterval(this.updateCounts, 3000);
+      });
+
     }
 
   });
