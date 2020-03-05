@@ -20,6 +20,11 @@ body * {
   outline : none !important;
 }
 
+#details-dialog-content {
+  color            : #fff !important;
+  background-color : #595959 !important;
+}
+
 #header-panel {
   flex-shrink : 0;
   flex-grow   : 0;
@@ -183,8 +188,8 @@ body * {
 }
 
 .count-node {
-  flex-shrink  : 1;
-  flex-grow    : 1;
-  min-width    : 0;
-  min-height   : 0;
+  flex-shrink : 1;
+  flex-grow   : 1;
+  min-width   : 0;
+  min-height  : 0;
 }

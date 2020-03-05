@@ -243,17 +243,6 @@ define([
         }
       };
 
-      const assetsRenderer = {
-        type: "unique-value",
-        field: "assetType",
-        uniqueValueInfos: assetTypes.map(assetType => {
-          return {
-            value: assetType.type,
-            symbol: getLocationSymbol(assetType.color)
-          };
-        })
-      };
-
       const createAssetLabels = (assetType) => {
         return {
           where: `(assetType = '${assetType.type}') AND (alongMinutes = 0.0)`,
@@ -333,7 +322,16 @@ define([
         //popupTemplate: { content: "{assetType}: {routeName} @ {alongMinutes} of {totalTime}" },
         labelsVisible: true,
         labelingInfo: assetLabelingInfo.concat(movingAssetLabelingInfo),
-        renderer: assetsRenderer
+        renderer: {
+                type: "unique-value",
+                field: "assetType",
+                uniqueValueInfos: assetTypes.map(assetType => {
+                  return {
+                    value: assetType.type,
+                    symbol: getLocationSymbol(assetType.color)
+                  };
+                })
+              }
       });
       trackingLayer.load().then(() => {
         //console.info(trackingLayer.fields.map(f => f.name));
@@ -347,6 +345,7 @@ define([
         // ADD LAYER TO MAP //
         view.map.add(trackingLayer);
 
+        // UPDATE INTERVAL //
         this.updateInterval_ms = 3000;
 
         // WHEN LAYERVIEW IS READY //
