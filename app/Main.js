@@ -37,27 +37,16 @@ define([
   "esri/core/promiseUtils",
   "esri/portal/Portal",
   "esri/layers/Layer",
-  "esri/layers/CSVLayer",
-  "esri/layers/FeatureLayer",
   "esri/layers/StreamLayer",
   "esri/geometry/Extent",
+  "esri/geometry/geometryEngine",
   "esri/Graphic",
-  "esri/widgets/Home",
-  "esri/widgets/TimeSlider",
-  "esri/widgets/Search",
-  "esri/widgets/LayerList",
-  "esri/widgets/Legend",
-  "esri/widgets/BasemapGallery",
-  "esri/widgets/Expand"
+  "esri/symbols/support/symbolUtils",
+  "esri/widgets/Home"
 ], function(calcite, declare, ApplicationBase, i18n, itemUtils, domHelper,
             Color, colors, number, date, locale, on, query, dom, domClass, domConstruct,
             IdentityManager, Evented, watchUtils, promiseUtils, Portal,
-            Layer, CSVLayer, FeatureLayer, StreamLayer, Extent,
-            Graphic, Home, TimeSlider, Search, LayerList, Legend, BasemapGallery, Expand){
-
-  //
-  // http://mgeorge-lx/demo/incidents.html
-  //
+            Layer, StreamLayer, Extent, geometryEngine, Graphic, symbolUtils, Home){
 
   return declare([Evented], {
 
@@ -358,88 +347,32 @@ define([
         // ADD LAYER TO MAP //
         view.map.add(trackingLayer);
 
+        this.updateInterval_ms = 3000;
+
         // WHEN LAYERVIEW IS READY //
         view.whenLayerView(trackingLayer).then(trackingLayerView => {
+          //trackingLayerView.on("data-received", dataEvt => {});
 
-          const optionsPanel = document.getElementById("options-panel");
-          view.ui.add(optionsPanel, "bottom-left");
-          optionsPanel.classList.remove("hide");
+          watchUtils.whenFalseOnce(trackingLayerView, "updating", () => {
 
-          // FLOOR SELECTOR //
-          this.initializeFloorSelector(view, trackingLayerView);
+            const optionsPanel = document.getElementById("options-panel");
+            view.ui.add(optionsPanel, "top-right");
+            optionsPanel.classList.remove("hide");
 
-          // LEGEND //
-          this.initializeLegend(view, trackingLayer);
+            // COUNTS BY TYPE //
+            this.initializeCountsByType(view, trackingLayerView, assetTypes);
 
-          // STATISTICS //
-          this.initializeStats(view, trackingLayerView, assetTypes);
+            // LOCATION COUNTS
+            this.initializeLocationCount(view, trackingLayerView);
 
-          // SCENE SPIN //
-          this.initializeSceneSpin(view);
+            // FLOOR SELECTOR //
+            this.initializeFloorSelector(view, trackingLayerView);
 
+            const loadingLabel = document.getElementById("loading-label");
+            loadingLabel.classList.add("hide");
+
+          });
         });
-      });
-
-    },
-
-    /**
-     *
-     * @param view
-     * @param trackingLayer
-     */
-    initializeLegend: function(view, trackingLayer){
-
-      // LEGEND //
-      const legendPanel = domConstruct.create("div", { className: "panel panel-dark panel-no-padding animate-fade-in" });
-      const legend = new Legend({ container: domConstruct.create("div", {}, legendPanel), view: view, layerInfos: [{ layer: trackingLayer }] });
-      view.ui.add(legendPanel, "top-right");
-
-    },
-
-    /**
-     *
-     * @param view
-     */
-    initializeSceneSpin: function(view){
-
-      // ENABLE SPIN //
-      let rotating = false;
-      this.enableSpin = enabled => {
-        rotating = enabled;
-        if(rotating){
-          rotate();
-        }
-      };
-
-      // HEADING INCREMENT //
-      let headingIncrement = 0.025;
-
-      // ROTATE SCENE //
-      const rotate = () => {
-        if(!view.interacting){
-          view.goTo({
-            center: view.center,
-            heading: (view.camera.heading + headingIncrement)
-          }, { animate: false });
-          if(rotating){
-            requestAnimationFrame(rotate);
-          }
-        }
-      };
-
-      const loadingLabel = dom.byId("loading-label");
-      domClass.add(loadingLabel, "hide");
-
-      const playPauseBtn = dom.byId("play-pause-btn");
-      domClass.remove(playPauseBtn, "hide");
-
-      on(playPauseBtn, "click", () => {
-        domClass.toggle(playPauseBtn, "icon-ui-pause icon-ui-play");
-        if(domClass.contains(playPauseBtn, "icon-ui-pause")){
-          this.enableSpin(true);
-        } else {
-          this.enableSpin(false);
-        }
       });
 
     },
@@ -469,7 +402,8 @@ define([
           });
         });
 
-        this.updateCounts();
+        this.updateLocationCount();
+        this.updateCountsByType();
 
       });
     },
@@ -480,20 +414,25 @@ define([
      * @param trackingLayerView
      * @param assetTypes
      */
-    initializeStats: function(view, trackingLayerView, assetTypes){
+    initializeCountsByType: function(view, trackingLayerView, assetTypes){
 
       const countsNode = document.getElementById("counts-node");
 
       const countNodeByAssetType = assetTypes.reduce((list, assetType) => {
-        const assetTypeNode = domConstruct.create("div", { className: "font-size-2" }, countsNode);
-        const labelNode = domConstruct.create("span", { className: "padding-left-half", style: `border-left:solid 4px ${new Color(assetType.color).toHex()}`, innerHTML: assetType.type }, assetTypeNode);
-        const countNode = domConstruct.create("span", { className: "count-node right", innerHTML: "0" }, assetTypeNode);
-        list.set(assetType.type, countNode);
-        return list;
+        const assetTypeNode = domConstruct.create("div", { className: "asset-type-node font-size-0" }, countsNode);
+
+        const symbolNode = domConstruct.create("div", { className: "symbol-node" }, assetTypeNode);
+        const assetSymbol = trackingLayerView.layer.renderer.getSymbol(new Graphic({ attributes: { assetType: assetType.type } }));
+        symbolUtils.renderPreviewHTML(assetSymbol, { node: symbolNode, size: 16 });
+
+        const labelNode = domConstruct.create("div", { className: "asset-label padding-left-half", innerHTML: assetType.type }, assetTypeNode);
+        const countNode = domConstruct.create("div", { className: "count-node text-right", innerHTML: "0" }, assetTypeNode);
+
+        return list.set(assetType.type, countNode);
       }, new Map());
 
       let getLatestHandle;
-      this.updateCounts = () => {
+      this.updateCountsByType = () => {
 
         const latestQuery = trackingLayerView.filter ? trackingLayerView.filter.createQuery() : trackingLayerView.createQuery();
         latestQuery.set({
@@ -509,12 +448,72 @@ define([
 
       };
 
-      let intervalHandle;
-      watchUtils.whenFalseOnce(trackingLayerView, "updating", () => {
-        intervalHandle = setInterval(this.updateCounts, 3000);
-      });
+      this.updateCountsByType();
+      setInterval(() => { requestAnimationFrame(this.updateCountsByType); }, this.updateInterval_ms);
 
+    },
+
+    /**
+     *
+     * @param view
+     * @param trackingLayerView
+     */
+    initializeLocationCount: function(view, trackingLayerView){
+
+      const buildingSelect = document.getElementById("building-select");
+      const buildingList = document.getElementById("building-list");
+      const buildingCount = document.getElementById("building-count");
+
+      const buildingsLayer = view.map.layers.find(layer => {
+        return (layer.title === "Buildings");
+      });
+      if(buildingsLayer){
+        buildingsLayer.load().then(() => {
+          buildingsLayer.outFields = ["*"];
+
+          view.whenLayerView(buildingsLayer).then(buildingsLayerView => {
+            watchUtils.whenFalseOnce(buildingsLayerView, "updating", () => {
+
+              const buildingsQuery = buildingsLayerView.createQuery();
+              buildingsQuery.set({ orderByFields: ["NAME ASC"], outFields: ["NAME"] });
+              buildingsLayerView.queryFeatures(buildingsQuery).then(buildingsFS => {
+                const buildingFeatures = buildingsFS.features;
+                const buildingGeometries = buildingFeatures.map(f => geometryEngine.simplify(f.geometry));
+                const buildingsGeometry = geometryEngine.union(buildingGeometries);
+
+                const searchInfos = new Map();
+                searchInfos.set("anywhere", {});
+                searchInfos.set("buildings", { geometry: buildingsGeometry, spatialRelationship: "intersects" });
+                searchInfos.set("outside", { geometry: buildingsGeometry, spatialRelationship: "disjoint" });
+
+                buildingFeatures.forEach(buildingFeature => {
+                  searchInfos.set(buildingFeature.attributes.NAME, { geometry: buildingFeature.geometry, spatialRelationship: "intersects" });
+                  domConstruct.create("option", { innerHTML: buildingFeature.attributes.NAME, value: buildingFeature.attributes.NAME }, buildingList);
+                });
+
+                this.updateLocationCount = () => {
+                  const searchInfo = searchInfos.get(buildingSelect.value);
+
+                  const locationQuery = trackingLayerView.filter ? trackingLayerView.filter.createQuery() : trackingLayerView.createQuery();
+                  locationQuery.set(searchInfo);
+
+                  trackingLayerView.queryFeatureCount(locationQuery).then(count => {
+                    buildingCount.innerHTML = count;
+                  });
+
+                };
+
+                this.updateLocationCount();
+                setInterval(() => { requestAnimationFrame(this.updateLocationCount); }, this.updateInterval_ms);
+                buildingSelect.addEventListener("change", this.updateLocationCount);
+
+              });
+            });
+          });
+        });
+      }
     }
 
   });
 });
+

@@ -160,3 +160,31 @@ body * {
   background-size     : auto 80%;
   padding-right       : 60px;
 }
+
+.asset-type-node {
+  width           : 100%;
+  display         : inline-flex;
+  flex-direction  : row;
+  justify-content : space-between;
+}
+
+.symbol-node {
+  flex-shrink : 0;
+  flex-grow   : 0;
+  min-width   : 0;
+  min-height  : 0;
+}
+
+.asset-label {
+  flex-shrink : 0;
+  flex-grow   : 0;
+  min-width   : 0;
+  min-height  : 0;
+}
+
+.count-node {
+  flex-shrink  : 1;
+  flex-grow    : 1;
+  min-width    : 0;
+  min-height   : 0;
+}

@@ -81,7 +81,7 @@
 
       <div class="panel panel-dark">
         <fieldset id="floor-selector" class="radio-group trailer-quarter">
-          <legend class="radio-group-title icon-ui-filter">Floor Filter</legend>
+          <legend class="radio-group-title font-size-1 icon-ui-filter text-white">Floor Filter</legend>
           <input id="floor-1" class="radio-group-input" type="radio" name="floor-selector">
           <label class="radio-group-label" for="floor-1">1</label>
           <input id="floor-2" class="radio-group-input" type="radio" name="floor-selector">
@@ -94,6 +94,18 @@
       </div>
 
       <div class="panel panel-dark leader-quarter">
+        <div class="icon-ui-map-pin font-size-1 trailer-quarter text-white">Location Count</div>
+        <select id="building-select" class="select-full">
+          <option value="anywhere">[ anywhere ]</option>
+          <option value="buildings">[ inside any building ]</option>
+          <option value="outside">[ outside all buildings ]</option>
+          <optgroup id="building-list" label="Building"></optgroup>
+        </select>
+        <div id="building-count" class="font-size-5 text-center leader-half trailer-0">0</div>
+      </div>
+
+      <div class="panel panel-dark leader-quarter">
+        <div class="icon-ui-layer-list font-size-1 trailer-half text-white">Critical Hospital Assets</div>
         <div id="counts-node"></div>
       </div>
 
